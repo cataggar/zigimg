@@ -199,7 +199,7 @@ const TargaRLEDecoder = struct {
     fn stream(reader: *std.Io.Reader, writer: *std.Io.Writer, limit: std.Io.Limit) std.Io.Reader.StreamError!usize {
         const self: *TargaRLEDecoder = @alignCast(@fieldParentPtr("reader", reader));
 
-        var remaining: usize = @intFromEnum(limit);
+        var remaining: usize = @backingInt(limit);
 
         state_machine: switch (self.state) {
             .read_header => {
@@ -230,7 +230,7 @@ const TargaRLEDecoder = struct {
                         self.state = .read_header;
                         continue :state_machine .read_header;
                     } else {
-                        return @intFromEnum(limit) - remaining;
+                        return @backingInt(limit) - remaining;
                     }
                 } else {
                     self.state = .read_header;
@@ -281,7 +281,7 @@ const TargaRLEDecoder = struct {
                         continue :state_machine .repeated;
                     }
                 } else {
-                    return @intFromEnum(limit) - remaining;
+                    return @backingInt(limit) - remaining;
                 }
             },
         }
@@ -374,7 +374,7 @@ fn RunLengthSIMDEncoder(
         const VectorType = @Vector(VectorLength, IntType);
         const BytesPerPixels = (@typeInfo(IntType).int.bits + 7) / 8;
         const IndexStep = VectorLength * BytesPerPixels;
-        const MaskType = std.meta.Int(.unsigned, VectorLength);
+        const MaskType = @Int(.unsigned, VectorLength);
 
         comptime {
             if (!std.math.isPowerOfTwo(@typeInfo(IntType).int.bits)) {
@@ -466,7 +466,11 @@ fn RLEStreamEncoder(comptime ColorType: type) type {
                 if (std.mem.eql(u8, std.mem.asBytes(&rle_value), std.mem.asBytes(&value))) {
                     self.length += 1;
                 } else {
-                    try RunLengthEncoderCommon.flush(IntType, writer, @as(IntType, @bitCast(rle_value)), self.length);
+                    try RunLengthEncoderCommon.flush(IntType, writer, std.mem.readInt(
+                        IntType,
+                        std.mem.asBytes(&rle_value),
+                        @import("builtin").target.cpu.arch.endian(),
+                    ), self.length);
 
                     self.length = 1;
                     self.rle_value = value;
@@ -480,7 +484,11 @@ fn RLEStreamEncoder(comptime ColorType: type) type {
             }
 
             if (self.rle_value) |rle_value| {
-                try RunLengthEncoderCommon.flush(IntType, writer, @as(IntType, @bitCast(rle_value)), self.length);
+                try RunLengthEncoderCommon.flush(IntType, writer, std.mem.readInt(
+                    IntType,
+                    std.mem.asBytes(&rle_value),
+                    @import("builtin").target.cpu.arch.endian(),
+                ), self.length);
             }
         }
     };
@@ -1242,7 +1250,7 @@ pub const TGA = struct {
         if (self.header.image_type.run_length) {
             // The TGA spec recommend that the RLE compression should be done on scanline per scanline basis
             inline for (1..(4 + 1)) |bpp| {
-                const IntType = std.meta.Int(.unsigned, bpp * 8);
+                const IntType = @Int(.unsigned, bpp * 8);
 
                 if (bytes_per_pixel == bpp) {
                     if (comptime std.math.isPowerOfTwo(bpp)) {

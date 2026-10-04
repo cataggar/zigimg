@@ -8,7 +8,8 @@ This is a work in progress library to create, process, read and write different 
 
 ## Install & Build
 
-This library currently uses zig [0.16.0](https://ziglang.org/download/)
+This compatibility branch uses Zig [0.17.0](https://ziglang.org/download/)
+and preserves the pinned image-format behavior.
 
 ### Use zigimg in your project
 
